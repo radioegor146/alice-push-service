@@ -15,9 +15,18 @@ client.on('connect', () => {
   logger.info('Connected to MQTT')
 
   client.subscribe(environment.MQTT_TOPIC, error => {
-    if (error) {
+    if (!error) {
       logger.info(`Subscribed to ${environment.MQTT_TOPIC}`)
+      return
     }
+    logger.info(`Failed to subscribe to ${environment.MQTT_TOPIC}: ${error}`)
+  })
+  client.subscribe(environment.MQTT_RAW_TOPIC, error => {
+    if (!error) {
+      logger.info(`Subscribed to ${environment.MQTT_RAW_TOPIC}`)
+      return
+    }
+    logger.info(`Failed to subscribe to ${environment.MQTT_RAW_TOPIC}: ${error}`)
   })
 })
 
@@ -25,17 +34,37 @@ client.on('error', error => {
   logger.warn(`MQTT error: ${error}`)
 })
 
-client.on('message', (_, payload) => {
-  const text = payload.toString('utf8')
-  fetch(environment.PUSH_API_ENDPOINT, {
-    body: JSON.stringify({
-      eventText: text
-    }),
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    method: 'POST'
-  }).catch(error => {
-    logger.error(`Failed to push event: ${error}`)
-  })
+client.on('message', (topic, payload) => {
+  switch (topic) {
+    case environment.MQTT_RAW_TOPIC: {
+      const text = payload.toString('utf8')
+      fetch(environment.PUSH_RAW_API_ENDPOINT, {
+        body: JSON.stringify({
+          eventText: text
+        }),
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        method: 'POST'
+      }).catch(error => {
+        logger.error(`Failed to push event: ${error}`)
+      })
+      break
+    }
+    case environment.MQTT_TOPIC: {
+      const text = payload.toString('utf8')
+      fetch(environment.PUSH_API_ENDPOINT, {
+        body: JSON.stringify({
+          eventText: text
+        }),
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        method: 'POST'
+      }).catch(error => {
+        logger.error(`Failed to push event: ${error}`)
+      })
+      break
+    }
+  }
 })
